@@ -1,0 +1,2 @@
+class APIIntegrationError(Exception):
+    pass
