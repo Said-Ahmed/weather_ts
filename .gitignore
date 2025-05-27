@@ -30,9 +30,6 @@ build/
 
 .ipynb_checkpoints/
 
-migration/
-alembic/versions/
-
 poetry.lock
 pyproject.toml
 
