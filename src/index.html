@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Прогноз погоды</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .weather-container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .search-form {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            padding: 10px;
+            flex-grow: 1;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .current-weather {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .weather-icon {
+            font-size: 64px;
+            margin-right: 20px;
+        }
+        .weather-details {
+            flex-grow: 1;
+        }
+        .hourly-forecast {
+            display: flex;
+            overflow-x: auto;
+            gap: 15px;
+            padding: 10px 0;
+        }
+        .hour-card {
+            min-width: 80px;
+            text-align: center;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .weather-code {
+            font-size: 1.2em;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="weather-container">
+        <h1>Прогноз погоды</h1>
+
+        <div class="search-form">
+            <input type="text" id="city-input" placeholder="Введите город (например, Москва)">
+            <button onclick="getWeather()">Поиск</button>
+        </div>
+
+        <div id="error-message" class="error"></div>
+
+        <div id="current-weather" class="current-weather" style="display: none;">
+            <div class="weather-icon" id="weather-icon">☀️</div>
+            <div class="weather-details">
+                <h2 id="city-name"></h2>
+                <div class="temperature" id="temperature"></div>
+                <div class="weather-code" id="weather-code"></div>
+                <div id="wind-info"></div>
+                <div id="time-info"></div>
+            </div>
+        </div>
+
+        <h3>Почасовой прогноз</h3>
+        <div id="hourly-forecast" class="hourly-forecast"></div>
+
+        <h3>Дневной максимум</h3>
+        <div id="daily-max"></div>
+    </div>
+
+    <script>
+        // Функция для получения погоды
+        async function getWeather() {
+            const city = document.getElementById('city-input').value.trim();
+            if (!city) {
+                showError('Пожалуйста, введите название города');
+                return;
+            }
+
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/weather/?city=${encodeURIComponent(city)}`);
+                if (!response.ok) {
+                    throw new Error('Город не найден');
+                }
+                const data = await response.json();
+                displayWeather(data, city);
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        // Функция для отображения погоды
+        function displayWeather(data, city) {
+            document.getElementById('error-message').textContent = '';
+
+            // Текущая погода
+            const current = data.current_weather;
+            document.getElementById('current-weather').style.display = 'flex';
+            document.getElementById('city-name').textContent = city;
+            document.getElementById('temperature').textContent = `${current.temperature}°C`;
+            document.getElementById('wind-info').textContent = `Ветер: ${current.windspeed} км/ч, направление ${current.winddirection}°`;
+            document.getElementById('time-info').textContent = `Обновлено: ${formatTime(current.time)}`;
+
+            // Иконка погоды
+            const weatherIcon = document.getElementById('weather-icon');
+            weatherIcon.textContent = getWeatherIcon(current.weathercode, current.is_day);
+            document.getElementById('weather-code').textContent = getWeatherDescription(current.weathercode);
+
+            // Почасовой прогноз
+            const hourlyContainer = document.getElementById('hourly-forecast');
+            hourlyContainer.innerHTML = '';
+
+            for (let i = 0; i < data.hourly.time.length; i++) {
+                const hourCard = document.createElement('div');
+                hourCard.className = 'hour-card';
+
+                const time = new Date(data.hourly.time[i]);
+                const hours = time.getHours().toString().padStart(2, '0');
+
+                hourCard.innerHTML = `
+                    <div><strong>${hours}:00</strong></div>
+                    <div>${data.hourly.temperature_2m[i]}°C</div>
+                `;
+
+                hourlyContainer.appendChild(hourCard);
+            }
+
+            // Дневной максимум
+            const dailyMax = document.getElementById('daily-max');
+            dailyMax.innerHTML = `
+                <div>Максимальная температура сегодня: ${data.daily.temperature_2m_max[0]}°C</div>
+            `;
+        }
+
+        // Функция для отображения ошибок
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('current-weather').style.display = 'none';
+            document.getElementById('hourly-forecast').innerHTML = '';
+            document.getElementById('daily-max').innerHTML = '';
+        }
+
+        // Вспомогательные функции
+        function formatTime(isoTime) {
+            const date = new Date(isoTime);
+            return date.toLocaleString('ru-RU');
+        }
+
+        function getWeatherIcon(weatherCode, isDay) {
+            const icons = {
+                0: isDay ? '☀️' : '🌙',  // Ясно
+                1: isDay ? '🌤' : '🌤',  // Преимущественно ясно
+                2: '⛅',  // Переменная облачность
+                3: '☁️',  // Пасмурно
+                45: '🌫', // Туман
+                48: '🌫', // Иней
+                51: '🌦', // Легкая морось
+                53: '🌧', // Умеренная морось
+                55: '🌧', // Сильная морось
+                56: '🌧', // Ледяная морось
+                57: '🌧', // Сильная ледяная морось
+                61: '🌧', // Небольшой дождь
+                63: '🌧', // Умеренный дождь
+                65: '🌧', // Сильный дождь
+                66: '🌧', // Ледяной дождь
+                67: '🌧', // Сильный ледяной дождь
+                71: '❄️', // Небольшой снег
+                73: '❄️', // Умеренный снег
+                75: '❄️', // Сильный снег
+                77: '❄️', // Снежные зерна
+                80: '🌧', // Небольшие ливни
+                81: '🌧', // Умеренные ливни
+                82: '🌧', // Сильные ливни
+                85: '❄️', // Небольшие снегопады
+                86: '❄️', // Сильные снегопады
+                95: '⛈',  // Гроза
+                96: '⛈',  // Гроза с небольшим градом
+                99: '⛈'   // Гроза с сильным градом
+            };
+            return icons[weatherCode] || '❓';
+        }
+
+        function getWeatherDescription(weatherCode) {
+            const descriptions = {
+                0: "Ясно",
+                1: "Преимущественно ясно",
+                2: "Переменная облачность",
+                3: "Пасмурно",
+                45: "Туман",
+                48: "Иней",
+                51: "Легкая морось",
+                53: "Умеренная морось",
+                55: "Сильная морось",
+                56: "Ледяная морось",
+                57: "Сильная ледяная морось",
+                61: "Небольшой дождь",
+                63: "Умеренный дождь",
+                65: "Сильный дождь",
+                66: "Ледяной дождь",
+                67: "Сильный ледяной дождь",
+                71: "Небольшой снег",
+                73: "Умеренный снег",
+                75: "Сильный снег",
+                77: "Снежные зерна",
+                80: "Небольшие ливни",
+                81: "Умеренные ливни",
+                82: "Сильные ливни",
+                85: "Небольшие снегопады",
+                86: "Сильные снегопады",
+                95: "Гроза",
+                96: "Гроза с небольшим градом",
+                99: "Гроза с сильным градом"
+            };
+            return descriptions[weatherCode] || "Неизвестно";
+        }
+
+        // Поиск при нажатии Enter
+        document.getElementById('city-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                getWeather();
+            }
+        });
+    </script>
+</body>
+</html>

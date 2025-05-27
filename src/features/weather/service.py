@@ -36,4 +36,5 @@ async def get(city: str):
                 "forecast_days": 1
             }
         )
+
         return weather_response.json()
